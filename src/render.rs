@@ -5,7 +5,33 @@ use std::fmt::Write;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-const FONT: &str = "Menlo, 'DejaVu Sans Mono', 'Liberation Mono', Consolas, monospace";
+const DEFAULT_FONTS: &str = "Menlo, 'DejaVu Sans Mono', 'Liberation Mono', Consolas, monospace";
+
+#[derive(Clone, Copy, Default)]
+pub struct Font<'a>(Option<&'a str>);
+
+impl<'a> Font<'a> {
+    pub fn new(family: Option<&'a str>) -> Result<Self, &'static str> {
+        if let Some(name) = family.map(str::trim) {
+            if name.is_empty()
+                || !name
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || " -_.".contains(c))
+            {
+                return Err("pass a single font family name (such as 'Agent Mono Nerd Font')");
+            }
+            return Ok(Self(Some(name)));
+        }
+        Ok(Self(None))
+    }
+
+    fn stack(self) -> String {
+        match self.0 {
+            Some(name) => format!("'{name}', {DEFAULT_FONTS}"),
+            None => DEFAULT_FONTS.into(),
+        }
+    }
+}
 const DARK: [&str; 19] = [
     "#171923", "#252938", "#e5e9f0", "#34394b", "#f78c9b", "#a4d893", "#f4cd81", "#8eb6ff",
     "#d7a9ff", "#83dcca", "#d0d6e5", "#818aa4", "#ffadb8", "#bdeba8", "#ffe0a3", "#aecaff",
@@ -82,7 +108,8 @@ pub fn text(screen: &Screen) -> String {
     out
 }
 
-pub fn html(screen: &Screen, theme: Theme, title: &str, fragment: bool) -> String {
+pub fn html(screen: &Screen, theme: Theme, title: &str, fragment: bool, font: Font<'_>) -> String {
+    let font_stack = font.stack();
     let mut out = String::new();
     if !fragment {
         out.push_str(
@@ -136,7 +163,7 @@ pub fn html(screen: &Screen, theme: Theme, title: &str, fragment: bool) -> Strin
 }}
 .tui-shot pre {{
   margin: 0; padding: 20px; overflow: auto; white-space: pre;
-  font: 14px/1.35 var(--tui-font, {FONT});
+  font: 14px/1.35 var(--tui-font, var(--tui-capture-font));
   font-variant-ligatures: none;
   color: inherit; background: transparent;
 }}
@@ -150,7 +177,7 @@ pub fn html(screen: &Screen, theme: Theme, title: &str, fragment: bool) -> Strin
     }
     writeln!(
         out,
-        "<figure class=\"tui-shot\" data-theme=\"{}\">",
+        "<figure class=\"tui-shot\" data-theme=\"{}\" style=\"--tui-capture-font: {font_stack}\">",
         theme.name()
     )
     .unwrap();
@@ -225,7 +252,7 @@ fn block_rect(glyph: &str) -> Option<(f64, f64, f64, f64)> {
     })
 }
 
-pub fn svg(screen: &Screen, theme: Theme, title: &str) -> String {
+pub fn svg(screen: &Screen, theme: Theme, title: &str, font: Font<'_>) -> String {
     const CELL: f64 = 8.43;
     const ROW: f64 = 18.;
     const PAD: f64 = 20.;
@@ -239,6 +266,7 @@ pub fn svg(screen: &Screen, theme: Theme, title: &str) -> String {
     let width = (columns as f64 * CELL + 2. * PAD + 1.).floor();
     let height = screen.len() as f64 * ROW + 2. * PAD + bar;
     let [bg, title_bg, fg, ..] = *theme.palette();
+    let font_stack = font.stack();
     let mut out = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" \
         height=\"{height}\" viewBox=\"0 0 {width} {height}\" role=\"img\">\n<title>"
@@ -262,7 +290,7 @@ pub fn svg(screen: &Screen, theme: Theme, title: &str) -> String {
         write!(
             out,
             "<rect width=\"{width}\" height=\"{bar}\" fill=\"{title_bg}\"/>\n\
-            <text x=\"{PAD}\" y=\"23\" fill=\"{fg}\" font-family=\"{FONT}\" \
+            <text x=\"{PAD}\" y=\"23\" fill=\"{fg}\" font-family=\"{font_stack}\" \
             font-size=\"13\" font-weight=\"bold\" xml:space=\"preserve\">"
         )
         .unwrap();
@@ -271,7 +299,7 @@ pub fn svg(screen: &Screen, theme: Theme, title: &str) -> String {
     }
     writeln!(
         out,
-        "<g font-family=\"{FONT}\" font-size=\"14\" xml:space=\"preserve\">"
+        "<g font-family=\"{font_stack}\" font-size=\"14\" xml:space=\"preserve\">"
     )
     .unwrap();
     for (y, row) in screen.iter().enumerate() {
@@ -345,7 +373,12 @@ pub fn svg(screen: &Screen, theme: Theme, title: &str) -> String {
     out
 }
 
-pub fn png(svg: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn png(
+    screen: &Screen,
+    theme: Theme,
+    title: &str,
+    font: Font<'_>,
+) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut options = usvg::Options::default();
     let fonts = options.fontdb_mut();
     fonts.load_system_fonts();
@@ -353,7 +386,21 @@ pub fn png(svg: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     if fonts.faces().next().is_none() {
         return Err("no fonts found; install a monospace font such as DejaVu Sans Mono".into());
     }
-    let tree = usvg::Tree::from_str(svg, &options)?;
+    let font = if let Some(requested) = font.0 {
+        let name = fonts
+            .faces()
+            .flat_map(|face| face.families.iter())
+            .map(|(name, _)| name.as_str())
+            .find(|name| name.eq_ignore_ascii_case(requested))
+            .ok_or_else(|| {
+                format!("font family '{requested}' not found; install it or omit --font")
+            })?;
+        Font::new(Some(name))?
+    } else {
+        font
+    };
+    let svg = svg(screen, theme, title, font);
+    let tree = usvg::Tree::from_str(&svg, &options)?;
     let size = tree.size().to_int_size();
     let (width, height) = (size.width() * 2, size.height() * 2);
     if u64::from(width) * u64::from(height) > 32_000_000 {
@@ -376,7 +423,7 @@ mod tests {
     #[test]
     fn html_keeps_text_selectable_and_escaped() {
         let screen = parse("\x1b[36m<>&\x1b[0m\n\x1b[7m x \x1b[0m");
-        let page = html(&screen, Theme::Light, "<demo>", true);
+        let page = html(&screen, Theme::Light, "<demo>", true, Font::default());
         assert!(!page.contains("<!doctype"));
         assert!(page.contains("data-theme=\"light\""));
         assert!(page.contains("<figcaption>&lt;demo&gt;</figcaption>"));
@@ -387,10 +434,24 @@ mod tests {
 
     #[test]
     fn png_uses_two_pixels_per_svg_unit() {
-        let svg = svg(&parse("\x1b[32m█\x1b[0m"), Theme::Dark, "");
-        let bytes = png(&svg).unwrap();
+        let bytes = png(&parse("\x1b[32m█\x1b[0m"), Theme::Dark, "", Font::default()).unwrap();
         assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
         assert_eq!(u32::from_be_bytes(bytes[16..20].try_into().unwrap()), 98);
         assert_eq!(u32::from_be_bytes(bytes[20..24].try_into().unwrap()), 116);
+    }
+
+    #[test]
+    fn custom_font_is_first_in_the_stack() {
+        let screen = parse("󰢱");
+        let font = Font::new(Some("Agent Mono Nerd Font")).unwrap();
+        assert!(
+            svg(&screen, Theme::Dark, "", font)
+                .contains("font-family=\"'Agent Mono Nerd Font', Menlo")
+        );
+        assert!(
+            html(&screen, Theme::Dark, "", true, font)
+                .contains("style=\"--tui-capture-font: 'Agent Mono Nerd Font', Menlo")
+        );
+        assert!(Font::new(Some("bad';font-size:999px")).is_err());
     }
 }

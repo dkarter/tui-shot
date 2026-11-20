@@ -9,10 +9,16 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use usage_rs::{Args, Cli, Subcommands, ValueEnum, complete::Shell};
 
+const SKILL: &str = include_str!("../skills/github-readme-images/SKILL.md");
+
 /// Capture terminal panes as PNG, SVG, or selectable, themeable HTML.
 #[derive(Cli)]
 #[usage(bin = "tui-shot", version = env!("CARGO_PKG_VERSION"), completion)]
 struct App {
+    /// Print the GitHub README Images agent skill.
+    #[usage(long)]
+    skill: bool,
+
     #[usage(flatten)]
     capture: Capture,
 
@@ -90,6 +96,10 @@ struct Capture {
     #[usage(long)]
     title: Option<String>,
 
+    /// Use an installed font family for PNG, SVG, or HTML.
+    #[usage(long)]
+    font: Option<String>,
+
     /// Print embeddable HTML instead of a complete HTML page.
     #[usage(long)]
     fragment: bool,
@@ -106,6 +116,11 @@ fn main() -> ExitCode {
 }
 
 fn run(app: App) -> Result<(), Box<dyn Error>> {
+    if app.skill {
+        print!("{SKILL}");
+        return Ok(());
+    }
+
     if let Some(Commands::Completions(cmd)) = app.command {
         let script = App::completion_script(match cmd.shell {
             CompletionShell::Bash => Shell::Bash,
@@ -122,6 +137,10 @@ fn run(app: App) -> Result<(), Box<dyn Error>> {
     if args.fragment && kind != OutputFormat::Html {
         return Err("--fragment requires .html output".into());
     }
+    if args.font.is_some() && matches!(kind, OutputFormat::Ansi | OutputFormat::Text) {
+        return Err("--font requires PNG, SVG, or HTML output".into());
+    }
+    let font = render::Font::new(args.font.as_deref())?;
     let data = match (args.input, args.pane) {
         (Some(_), Some(_)) => return Err("--input and --pane cannot be used together".into()),
         (Some(path), None) if path == Path::new("-") => {
@@ -137,11 +156,11 @@ fn run(app: App) -> Result<(), Box<dyn Error>> {
     let rendered = match kind {
         OutputFormat::Ansi => data,
         OutputFormat::Html => {
-            render::html(&screen(), args.theme, &title, args.fragment).into_bytes()
+            render::html(&screen(), args.theme, &title, args.fragment, font).into_bytes()
         }
         OutputFormat::Text => render::text(&screen()).into_bytes(),
-        OutputFormat::Svg => render::svg(&screen(), args.theme, &title).into_bytes(),
-        OutputFormat::Png => render::png(&render::svg(&screen(), args.theme, &title))?,
+        OutputFormat::Svg => render::svg(&screen(), args.theme, &title, font).into_bytes(),
+        OutputFormat::Png => render::png(&screen(), args.theme, &title, font)?,
     };
     fs::write(&output, rendered).map_err(|e| format!("{}: {e}", output.display()))?;
     Ok(())

@@ -41,6 +41,10 @@ npx skills add dkarter/tui-shot --skill github-readme-images -g
 
 Omit `-g` to install it for the current project only.
 
+Starting with the next binary release, `tui-shot --skill` prints the skill.
+Each release archive ships the skill, and the signed Packslip manifest points
+to it.
+
 ## Take your first shot
 
 From inside the pane you want to capture:
@@ -88,9 +92,13 @@ Here it’s editing a Markdown guide in Normal mode.
 
 A Lua screenshot helper in
 [Dorian’s Neovim setup](https://github.com/dkarter/dotfiles/tree/master/config/nvim),
-with Tokyo Night syntax highlighting.
+with Tokyo Night syntax highlighting and Agent Mono Nerd Font icons.
 
-![Neovim editing a Lua helper with Tokyo Night syntax highlighting](https://github.com/user-attachments/assets/5a6630d3-95a6-4259-94ec-7bd21a8c9abe)
+![Neovim editing a Lua helper with Tokyo Night and Agent Mono Nerd Font icons](https://github.com/user-attachments/assets/79601ef9-c261-4611-ac71-6e764a0fdb2a)
+
+Use `--font 'Agent Mono Nerd Font'` with the next release, or pass the name of
+your own installed monospace font. PNG and SVG use a fixed terminal grid, so
+glyph spacing can differ slightly from your terminal.
 
 ## Publish text, not pixels
 

@@ -73,7 +73,7 @@ jobs:
       - run: rustup update stable
       - run: cargo +stable test --locked
       - run: cargo +stable build --locked --release
-      - name: Package binary and completions
+      - name: Package binary, completions, and agent skill
         env:
           PLATFORM: ${{ matrix.platform }}
           TAG: ${{ needs.prepare.outputs.tag }}
@@ -115,6 +115,7 @@ jobs:
             completion/bash=archive:share/bash-completion/completions/tui-shot
             completion/fish=archive:share/fish/vendor_completions.d/tui-shot.fish
             completion/zsh=archive:share/zsh/site-functions/_tui-shot
+            skill/github-readme-images=archive:share/tui-shot/skills/github-readme-images
       - name: Check that immutable releases are enabled
         id: immutability
         env:

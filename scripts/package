@@ -10,10 +10,11 @@ mkdir -p dist \
   "$stage/share/bash-completion/completions" \
   "$stage/share/fish/vendor_completions.d" \
   "$stage/share/zsh/site-functions" \
-  "$stage/share/tui-shot"
+  "$stage/share/tui-shot/skills/github-readme-images"
 
 cp "$bin" LICENSE "$stage/"
 "$bin" __usage_spec__ > "$stage/share/tui-shot/tui-shot.usage.kdl"
+"$bin" --skill > "$stage/share/tui-shot/skills/github-readme-images/SKILL.md"
 "$bin" completions bash > "$stage/share/bash-completion/completions/tui-shot"
 "$bin" completions fish > "$stage/share/fish/vendor_completions.d/tui-shot.fish"
 "$bin" completions zsh > "$stage/share/zsh/site-functions/_tui-shot"
