@@ -1,0 +1,18 @@
+[package]
+name = "tui-shot"
+version = "0.1.0"
+edition = "2024"
+description = "Capture terminal panes as PNG, SVG, or selectable, themeable HTML"
+license = "MIT"
+repository = "https://github.com/dkarter/tui-shot"
+
+[dependencies]
+regex = "1"
+resvg = { version = "0.50", default-features = false, features = ["text", "system-fonts"] }
+unicode-segmentation = "1"
+unicode-width = "0.2"
+usage-rs = { version = "7.4", features = ["completions"] }
+
+[profile.release]
+strip = true
+lto = "thin"

@@ -1,0 +1,125 @@
+name: Release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      resume_tag:
+        description: Resume publishing an existing draft tag (leave blank to run Release Please)
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      tag: ${{ steps.target.outputs.tag }}
+      sha: ${{ steps.target.outputs.sha }}
+    steps:
+      - uses: googleapis/release-please-action@v5.0.0
+        id: release
+        if: inputs.resume_tag == ''
+      - id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.resume_tag || steps.release.outputs.tag_name }}
+        run: |
+          if [[ -z "$TAG" ]]; then exit 0; fi
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+          [[ "$draft" == true ]]
+          sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)"
+          if [[ "$sha" != "$GITHUB_SHA" ]]; then
+            echo "Run this workflow on $TAG so the attestation identifies the build commit." >&2
+            exit 1
+          fi
+          printf 'tag=%s\nsha=%s\n' "$TAG" "$sha" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.tag != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux-x64
+          - os: ubuntu-22.04-arm
+            platform: linux-arm64
+          - os: macos-15-intel
+            platform: macos-x64
+          - os: macos-15
+            platform: macos-arm64
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - run: rustup update stable
+      - run: cargo +stable test --locked
+      - run: cargo +stable build --locked --release
+      - name: Package binary and completions
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: bash scripts/package "$TAG" "$PLATFORM"
+      - uses: actions/attest@v4.2.2 # Verified immutable.
+        with:
+          subject-path: dist/*.tar.gz
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Upload archives to the release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release upload "$TAG" dist/*.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
+      - uses: jdx/packslip@v1.11.4 # Verified immutable.
+        with:
+          tag: ${{ needs.prepare.outputs.tag }}
+          commit: ${{ needs.prepare.outputs.sha }}
+          artifacts: dist/*.tar.gz
+          bin: tui-shot
+          attest: link
+          resources: |
+            cli-spec/usage=archive:share/tui-shot/tui-shot.usage.kdl
+            completion/bash=archive:share/bash-completion/completions/tui-shot
+            completion/fish=archive:share/fish/vendor_completions.d/tui-shot.fish
+            completion/zsh=archive:share/zsh/site-functions/_tui-shot
+      - name: Publish draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/immutable-releases" --jq .enabled)" == true ]]
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft=false
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .immutable)" == true ]]
