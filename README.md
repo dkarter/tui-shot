@@ -29,6 +29,18 @@ include attested binaries and Bash, Fish, and Zsh completions.
 Herdr is only needed for live capture. On a minimal Linux system, install a
 monospace font such as DejaVu Sans Mono for PNG rendering.
 
+### Install the agent skill
+
+The optional [GitHub README Images skill](skills/github-readme-images/SKILL.md)
+teaches your agent to capture terminal screenshots, upload them to a GitHub
+issue, and embed the images in a README without committing PNGs.
+
+```sh
+npx skills add dkarter/tui-shot --skill github-readme-images -g
+```
+
+Omit `-g` to install it for the current project only.
+
 ## Take your first shot
 
 From inside the pane you want to capture:
