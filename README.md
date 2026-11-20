@@ -1,61 +1,90 @@
 # tui-shot
 
-Turn a live [Herdr](https://herdr.dev/) terminal pane into a screenshot without
-moving focus. Save it as a PNG for docs or as selectable, themeable HTML for the
-web. No Python, browser, or external PNG renderer required.
+**Your TUI deserves better than a cropped desktop screenshot.**
 
-![Sample tui-shot capture: Workbench project status](examples/workbench.png)
+Capture any live [Herdr](https://herdr.dev/) pane without switching to it. Drop
+a crisp 2× PNG into your README, publish an SVG, or share a terminal card with
+text readers can select, copy, and recolor. Agents and scripts can capture the
+same pane with one command. No browser or separate renderer required.
+
+![The tui-shot CLI showing capture flags, themes, and output formats](https://github.com/user-attachments/assets/abdd34e0-3ed1-4f1a-ab52-14759fa38812)
 
 ## Install
 
-Prebuilt binaries are available for macOS and Linux on arm64 and x64.
+**With Mise** · macOS and Linux, ARM64 and x64:
 
 ```sh
 mise use -g packslip:github.com/dkarter/tui-shot@0.1.0
 ```
 
-Or use [packslip](https://packslip.dev/docs/install/) directly:
+**Without Mise**, use [Packslip](https://packslip.dev/docs/install/) directly:
 
 ```sh
 packslip install github.com/dkarter/tui-shot
 ```
 
-The [GitHub releases](https://github.com/dkarter/tui-shot/releases) include
-attested archives, a signed Packslip manifest, and Bash, Fish, and Zsh
-completions. Build from source with `cargo install --locked --path .`.
+Prefer a manual download? The [GitHub releases](https://github.com/dkarter/tui-shot/releases)
+include attested binaries and Bash, Fish, and Zsh completions.
 
-Herdr is needed only for live capture. PNG uses your system fonts. On a minimal
-Linux system, install a monospace font such as DejaVu Sans Mono.
+Herdr is only needed for live capture. On a minimal Linux system, install a
+monospace font such as DejaVu Sans Mono for PNG rendering.
 
-## Capture a pane
+## Take your first shot
 
-```sh
-herdr pane list
-tui-shot --pane "$pane" --title "My app · Overview" -o overview.png
-tui-shot --pane "$pane" --theme light --fragment -o overview.html
-```
-
-Omit `--pane` to capture the calling Herdr pane. The output extension picks the
-format: `.png` (2×), `.svg`, `.html`, `.txt`, or `.ansi`. To render the same
-viewport more than once, capture it as `.ansi` and pass it back with `--input`:
+From inside the pane you want to capture:
 
 ```sh
-tui-shot --pane "$pane" -o overview.ansi
-tui-shot --input overview.ansi -o overview.svg
+tui-shot --title "My TUI" -o screenshot.png
 ```
 
-The capture fits the content Herdr returns. The exporter can omit blank
-viewport edges and does not include the cursor. Font fallback and complex
-Unicode can render differently from the terminal. Review captures before
-sharing them: they may include private data. A raw `.ansi` export is not
-sanitized.
+To capture a different pane, find its ID with `herdr pane list` and pass it
+with `--pane`:
+
+```sh
+tui-shot --pane w1:p2 --theme light -o screenshot.html
+```
+
+Pick the format with the file extension: `.png`, `.svg`, `.html`, `.txt`, or
+`.ansi`. Save `.ansi` if you want to render the exact same frame again:
+
+```sh
+tui-shot -o frame.ansi
+tui-shot --input frame.ansi --theme light -o screenshot.svg
+```
+
+Review captures before sharing them. The raw `.ansi` file is not sanitized.
+
+## See it in action
+
+Every screenshot below came from `tui-shot` and a live Herdr pane.
+
+### Vellum
+
+[Vellum](https://github.com/dkarter/vellum) puts agents, tasks, and pull
+requests in a searchable terminal picker.
+
+![Vellum agent picker with two demo agents](https://github.com/user-attachments/assets/8b11ee8f-3092-415e-b202-e48243d7a9d7)
+
+### Ink
+
+[Ink](https://github.com/dkarter/ink) brings Vim editing to terminal prompts.
+Here it’s editing a Markdown guide in Normal mode.
+
+![Ink textarea showing a Markdown guide in Vim Normal mode](https://github.com/user-attachments/assets/0a13bb23-f42c-47c3-9170-0aa5bfe27303)
+
+### Neovim
+
+A Lua screenshot helper in
+[Dorian’s Neovim setup](https://github.com/dkarter/dotfiles/tree/master/config/nvim),
+with Tokyo Night syntax highlighting.
+
+![Neovim editing a Lua helper with Tokyo Night syntax highlighting](https://github.com/user-attachments/assets/5a6630d3-95a6-4259-94ec-7bd21a8c9abe)
 
 ## Publish text, not pixels
 
 HTML output preserves colors and terminal text, including Unicode box drawing.
-Use `--fragment` to embed it on a site that allows inline styles. Switch
-`data-theme` on the `<figure>` between `dark` and `light`, or override CSS
-variables for your site:
+Use `--fragment` to embed a card on a site that allows inline styles. Switch
+`data-theme` between `dark` and `light`, or match your site with CSS variables:
 
 ```css
 .tui-shot {
@@ -83,37 +112,8 @@ tui-shot --pane "$pane" --title "02 · Settings" -o 02-settings.png
 
 ## Completions
 
-Activated mise can load the completions declared in the Packslip manifest.
-For a manual install, generate your shell's script with
-`tui-shot completions bash`, `tui-shot completions fish`, or
-`tui-shot completions zsh`. To get the Usage spec, run `tui-shot __usage_spec__`.
+With Mise activated, it can load the packaged completions for you. Otherwise
+generate a script with `tui-shot completions bash`, `tui-shot completions fish`,
+or `tui-shot completions zsh`.
 
-## Releases
-
-Conventional Commits drive the Release Please PR. Merging it creates a draft
-release, then CI builds and attests each archive and attaches the signed
-Packslip bundle before publishing. Keep immutable releases enabled, and allow
-GitHub Actions to create pull requests so Release Please can open its PR.
-GitHub may hold CI on automation-created PRs for approval.
-
-GitHub's default workflow token cannot read the immutability setting. Without
-extra credentials, CI leaves the signed release as a draft. A maintainer can
-publish it after checking the setting:
-
-```sh
-repo=dkarter/tui-shot
-tag=v0.1.0
-test "$(gh api "repos/$repo/immutable-releases" --jq .enabled)" = true &&
-  gh release edit "$tag" --repo "$repo" --verify-tag --draft=false
-```
-
-For automatic publishing, set the `IMMUTABILITY_READ_TOKEN` repository secret
-to a fine-grained token scoped to this repository with **Administration: Read**
-only. CI uses it only to check the setting; the default workflow token publishes
-the draft.
-
-To resume a failed draft, dispatch the `Release` workflow on the tag itself:
-
-```sh
-gh workflow run release.yml --ref v0.1.0 -f resume_tag=v0.1.0
-```
+[Development and releases](DEVELOPMENT.md) · [MIT license](LICENSE)
