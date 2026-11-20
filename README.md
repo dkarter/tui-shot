@@ -1,11 +1,11 @@
 # tui-shot
 
-**Your TUI deserves better than a cropped desktop screenshot.**
+**Blazing-fast, agent-native terminal screenshots. Built in Rust.**
 
 Capture any live [Herdr](https://herdr.dev/) pane without switching to it. Drop
 a crisp 2× PNG into your README, publish an SVG, or share a terminal card with
-text readers can select, copy, and recolor. Agents and scripts can capture the
-same pane with one command. No browser or separate renderer required.
+text readers can select, copy, and recolor. One command gives agents and scripts
+the same capture workflow you use by hand.
 
 ![The tui-shot CLI showing capture flags, themes, and output formats](https://github.com/user-attachments/assets/abdd34e0-3ed1-4f1a-ab52-14759fa38812)
 
