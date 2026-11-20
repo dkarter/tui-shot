@@ -96,6 +96,22 @@ Packslip bundle before publishing. Keep immutable releases enabled, and allow
 GitHub Actions to create pull requests so Release Please can open its PR.
 GitHub may hold CI on automation-created PRs for approval.
 
+GitHub's default workflow token cannot read the immutability setting. Without
+extra credentials, CI leaves the signed release as a draft. A maintainer can
+publish it after checking the setting:
+
+```sh
+repo=dkarter/tui-shot
+tag=v0.1.0
+test "$(gh api "repos/$repo/immutable-releases" --jq .enabled)" = true &&
+  gh release edit "$tag" --repo "$repo" --verify-tag --draft=false
+```
+
+For automatic publishing, set the `IMMUTABILITY_READ_TOKEN` repository secret
+to a fine-grained token scoped to this repository with **Administration: Read**
+only. CI uses it only to check the setting; the default workflow token publishes
+the draft.
+
 To resume a failed draft, dispatch the `Release` workflow on the tag itself:
 
 ```sh

@@ -115,11 +115,22 @@ jobs:
             completion/bash=archive:share/bash-completion/completions/tui-shot
             completion/fish=archive:share/fish/vendor_completions.d/tui-shot.fish
             completion/zsh=archive:share/zsh/site-functions/_tui-shot
+      - name: Check that immutable releases are enabled
+        id: immutability
+        env:
+          GH_TOKEN: ${{ secrets.IMMUTABILITY_READ_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo 'The signed draft is ready. A maintainer must verify immutability and publish it.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/immutable-releases" --jq .enabled)" == true ]]
+          echo 'enabled=true' >> "$GITHUB_OUTPUT"
       - name: Publish draft
+        if: steps.immutability.outputs.enabled == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/immutable-releases" --jq .enabled)" == true ]]
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft=false
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .immutable)" == true ]]
