@@ -1,6 +1,6 @@
 [package]
 name = "tui-shot"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Capture terminal panes as PNG, SVG, or selectable, themeable HTML"
 license = "MIT"
